@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function EditLinkForm({ id, initial }: { id: number; initial: { originalUrl: string; shortCode: string } }) {
+export default function EditLinkForm({ id, initial, onSaved }: { id: number; initial: { originalUrl: string; shortCode: string }; onSaved?: (updated: { id: number; originalUrl: string; shortCode: string }) => void }) {
   const router = useRouter();
   const [originalUrl, setOriginalUrl] = useState(initial.originalUrl);
   const [shortCode, setShortCode] = useState(initial.shortCode);
@@ -17,8 +17,13 @@ export default function EditLinkForm({ id, initial }: { id: number; initial: { o
       body: JSON.stringify({ id, originalUrl, shortCode }),
     });
     setLoading(false);
-    if (res.ok) router.push('/dashboard');
-    else alert('Update failed');
+    if (res.ok) {
+      if (onSaved) {
+        onSaved({ id, originalUrl, shortCode });
+      } else {
+        router.push('/dashboard');
+      }
+    } else alert('Update failed');
   }
 
   return (

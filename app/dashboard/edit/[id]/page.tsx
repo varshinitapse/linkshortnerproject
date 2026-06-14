@@ -3,7 +3,7 @@ import { currentUser } from '@clerk/nextjs/server';
 import { db } from '../../../../app/db';
 import { links } from '../../../../app/db/schema';
 import { eq } from 'drizzle-orm';
-import EditLinkForm from '../../../../../components/EditLinkForm';
+import EditLinkForm from '../../../../components/EditLinkForm';
 
 type Props = { params: { id: string } };
 
@@ -12,6 +12,9 @@ export default async function EditLinkPage({ params }: Props) {
   if (!user) redirect('/');
 
   const id = Number(params.id);
+  // guard against invalid ids (e.g. NaN) to avoid issuing bad queries
+  if (!params.id || Number.isNaN(id)) redirect('/dashboard');
+
   const result = await db.select().from(links).where(eq(links.id, id));
   const link = result[0];
   if (!link) redirect('/dashboard');

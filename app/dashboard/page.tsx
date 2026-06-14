@@ -4,6 +4,7 @@ import { db } from '../db';
 import { links } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import LinksList from '../../components/LinksList';
+import CreateLinkDialog from '../../components/CreateLinkDialog';
 
 export default async function DashboardPage() {
   const user = await currentUser();
@@ -25,7 +26,11 @@ export default async function DashboardPage() {
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-10">
-      <h1 className="text-3xl font-extrabold mb-8">My Links</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-extrabold">My Links</h1>
+        {/* @ts-expect-error Server -> Client component */}
+        <CreateLinkDialog />
+      </div>
 
       {serialized.length === 0 ? (
         <p className="text-muted-foreground">You don't have any links yet.</p>

@@ -1,6 +1,7 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import EditLinkForm from "./EditLinkForm";
 
 type LinkItem = {
   id: number;
@@ -14,6 +15,10 @@ export default function LinksList({ initialLinks }: { initialLinks: LinkItem[] }
   const router = useRouter();
   const [links, setLinks] = useState<LinkItem[]>(initialLinks || []);
   const [sort, setSort] = useState<"newest" | "oldest" | "alpha">("newest");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<LinkItem | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const sorted = useMemo(() => {
     const copy = [...links];
@@ -28,18 +33,16 @@ export default function LinksList({ initialLinks }: { initialLinks: LinkItem[] }
   }, [links, sort]);
 
   async function handleDelete(id: number) {
-    if (!confirm("Delete this link permanently?")) return;
-    const res = await fetch("/api/links/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    if (res.ok) setLinks((s) => s.filter((l) => l.id !== id));
-    else alert("Failed to delete");
+    // open confirm dialog instead
+    setDeletingId(id);
+    setDeleteOpen(true);
   }
 
   function handleEdit(id: number) {
-    router.push(`/dashboard/edit/${id}`);
+    const item = links.find((l) => l.id === id);
+    if (!item) return;
+    setEditing(item);
+    setEditOpen(true);
   }
 
   function handleCopyShort(shortCode: string) {
@@ -61,6 +64,23 @@ export default function LinksList({ initialLinks }: { initialLinks: LinkItem[] }
       return "/favicon.ico";
     }
   }
+
+  // Listen for newly created links dispatched from other client components
+  React.useEffect(() => {
+    function onCreated(e: Event) {
+      try {
+        // CustomEvent detail contains the LinkItem
+        // @ts-ignore
+        const detail = (e as CustomEvent).detail as LinkItem;
+        if (!detail) return;
+        setLinks((s) => [detail, ...s]);
+      } catch (err) {
+        // ignore
+      }
+    }
+    window.addEventListener('link:created', onCreated as EventListener);
+    return () => window.removeEventListener('link:created', onCreated as EventListener);
+  }, []);
 
   return (
     <div>
@@ -103,6 +123,52 @@ export default function LinksList({ initialLinks }: { initialLinks: LinkItem[] }
           </article>
         ))}
       </div>
+
+      {/* Edit modal */}
+      {editOpen && editing && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-lg font-semibold mb-4">Edit Link</h2>
+            <EditLinkForm
+              id={editing.id}
+              initial={{ originalUrl: editing.originalUrl, shortCode: editing.shortCode }}
+              // update local state on save
+              onSaved={(updated: { id: number; originalUrl: string; shortCode: string }) => {
+                setLinks((s) => s.map((l) => (l.id === updated.id ? { ...l, originalUrl: updated.originalUrl, shortCode: updated.shortCode } : l)));
+                setEditOpen(false);
+                setEditing(null);
+              }}
+            />
+            <div className="flex gap-2 justify-end mt-4">
+              <button onClick={() => { setEditOpen(false); setEditing(null); }} className="rounded px-3 py-2 border border-border">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-lg font-semibold mb-4">Delete link</h2>
+            <p className="mb-4">Are you sure you want to delete this link? This cannot be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => { setDeleteOpen(false); setDeletingId(null); }} className="rounded px-3 py-2 border border-border">Cancel</button>
+              <button onClick={async () => {
+                if (!deletingId) return;
+                const res = await fetch('/api/links/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deletingId }) });
+                if (res.ok) setLinks((s) => s.filter((l) => l.id !== deletingId));
+                else alert('Failed to delete');
+                setDeleteOpen(false);
+                setDeletingId(null);
+              }} className="rounded px-3 py-2 bg-destructive text-destructive-foreground">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+// component-level state additions
+
